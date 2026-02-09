@@ -3,7 +3,20 @@ import { useState } from 'react';
 function Chat() {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
+const uploadFile = async (e) => {
+    const form = new FormData();
+    form.append('file', e.target.files[0]);
+console.log(form);
 
+    await fetch('http://localhost:5000/upload', {
+      method: 'POST',
+      body: form,
+    });
+
+    alert('Indexed!');
+  };
+
+ 
   const ask = async () => {
     const res = await fetch('http://localhost:5000/chat', {
       method: 'POST',
@@ -16,6 +29,7 @@ function Chat() {
   };
 
   return (
+    <>
     <div>
       <input
         value={question}
@@ -26,6 +40,10 @@ function Chat() {
 
       <p>{answer}</p>
     </div>
+    <div>
+      <input type="file" onChange={uploadFile} />
+    </div>
+    </>
   );
 }
 

@@ -1,10 +1,15 @@
-//CHUNKING AND EMBEDDING SERVICE
+// CHUNKING AND EMBEDDING SERVICE
+
 const fs = require('fs');
 const pdf = require('pdf-parse');
+
 const Document = require('../models/document');
-const openai = require('../openai');
-const CHUNK_SIZE = 800; // characters
-const CHUNK_OVERLAP = 150; // characters
+const genAI = require('../gemini');
+
+const CHUNK_SIZE = 800;
+const CHUNK_OVERLAP = 150;
+
+// -------- Chunk Function ----------
 function chunkText(text, size, overlap) {
   const chunks = [];
 
@@ -14,20 +19,37 @@ function chunkText(text, size, overlap) {
 
   return chunks;
 }
+
 const ingestPDF = async (filePath) => {
-  const dataBuffer = fs.readFileSync(filePath);
-  const pdfData = await pdf(dataBuffer);
-  const text = pdfData.text;
-  const chunks = chunkText(text, CHUNK_SIZE, CHUNK_OVERLAP);
-  for (const chunk of chunks) {
-    const response = await openai.embeddings.create({
-      model: 'text-embedding-3-small',
-      input: chunk,
-    });
-    const embedding = response.data[0].embedding;
-    const doc = new Document({ content: chunk, embedding: embedding });
-    await doc.save();
+  try {
+    const dataBuffer = fs.readFileSync(filePath);
+    const pdfData = await pdf(dataBuffer);
+
+    const text = pdfData.text;
+
+    const chunks = chunkText(text, CHUNK_SIZE, CHUNK_OVERLAP);
+
+    for (const chunk of chunks) {
+      // ✅ CORRECT embedding call
+      const response = await genAI.models.embedContent({
+        model: 'gemini-embedding-001',
+        contents: chunk,
+      });
+
+      const embedding = response.embeddings[0].values;
+console.log(embedding.length);
+
+     const doc = new Document({
+        content: chunk,
+        embedding,
+      });
+await doc.save();
+    }
+
+    console.log('✅ Ingestion complete');
+  } catch (err) {
+    console.error('❌ Ingestion failed:', err);
   }
-  console.log('Ingestion complete');
 };
+
 module.exports = ingestPDF;

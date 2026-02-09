@@ -1,51 +1,64 @@
-//SEMANTIC RETRIEVAL +LLM
-const openai=require("../openai");
-const Document=require("../models/document");
-const askQue=async(question)=>{
-    //Get embedding for the question
-    const response=await openai.embeddings.create({
-        model:"text-embedding-3-small",
-        input:question,
+// SEMANTIC RETRIEVAL + LLM
+
+const genAI = require('../gemini');
+const Document = require('../models/document');
+
+const askQuestion = async (question) => {
+  try {
+    // ✅ 1. Create embedding for the question
+    const embeddingResult = await genAI.models.embedContent({
+      model: 'gemini-embedding-001',
+      contents: question,
     });
-    const queryVector=response.data[0].embedding;
-    //Find relevant documents vector search
-   const results=await Document.agggregate([
-    {
-        $vectorSearch:{ //semantic search engine
-            queryVector:queryVector,
-            path:"embedding",
-            numCandidates:100,//consider 100 closest vectors or docs
-            limit:5,//return top 5
-            index:"default" //name of the vector index
-    }}
-   ]);
 
-const context = results.map((r) => r.content).join('\n'); //extracting only text field removing db metadata
-//The LLM is now acting like a writer, not a search engine
-//Grounded Prompting
+    const queryVector = embeddingResult.embeddings[0].values;
 
-const completion = await openai.chat.completions.create({
-  model: 'gpt-4.1-mini',
-  messages: [
-    {
-      role: 'system',//rule maker 
-      content:
-        "Answer ONLY using the provided context. If not found, say you don't know.",
-    },
-    {
-      role: 'user',//-que asker
-      content: `
+    // ✅ 2. Vector Search
+    const results = await Document.aggregate([
+      {
+        $vectorSearch: {
+          queryVector,
+          path: 'embedding',
+          numCandidates: 100,
+          limit: 5,
+          index: 'vector_index', // ensure this matches your index name
+        },
+      },
+    ]);
+console.log(results,"hh");
+
+    // ✅ 3. Build Context
+    const context = results.map((r) => r.content).join('\n');
+
+    // 🚨 Guard (VERY important)
+    if (!context) {
+      return 'No relevant documents found.';
+    }
+
+    // ✅ 4. Generate Answer
+    const prompt = `
+You are a document assistant.
+
+Answer ONLY using the provided context.
+If the answer is not present, say "I don't know."
+
 Context:
 ${context}
 
 Question:
 ${question}
-        `,
-    },
-  ],
-});
-return completion.choices[0].message.content;
-}
-module.exports={
-    askQue  
-}
+`;
+
+    const result = await genAI.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    });
+
+    return result.text;
+  } catch (error) {
+    console.error('Error in askQuestion:', error);
+    throw error;
+  }
+};
+
+module.exports = askQuestion;
