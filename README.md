@@ -19,6 +19,17 @@ Similarity search
 Send relevant chunks to LLM
       ↓
 Grounded answer
+
+
+
+Stage 1 → Upload PDF
+Stage 2 → Chunk text
+Stage 3 → Gemini embeddings
+Stage 4 → Store vectors (Mongo)
+Stage 5 → Embed question (Gemini)
+Stage 6 → Vector search
+Stage 7 → Build grounded prompt
+Stage 8 → Gemini generates answer 
  # pdf-parse
 
  LLMs cannot read files.
